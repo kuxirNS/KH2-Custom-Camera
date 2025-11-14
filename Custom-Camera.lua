@@ -117,23 +117,40 @@ function ApplyPreset(param)
 	NewAutoCam_Speed = Camera.AutoCam_Speed*0.0004363323096
 	if GameVersion == 0x020A then
 		CameraSettingsEGS10()
+	elseif GameVersion == 0x030A then
+		CameraSettingsSTEAM10()
 	else
 		LogError("GameVersion is not implemented")
 		CanExecute = false
 		return
 	end
+	WriteFloat(HeightAddr, NewHeight)
+	WriteFloat(AngleAddr, NewAngle)
+	WriteFloat(Kbm_Stiff_Y_Addr, NewKbm_Stiffness_Y)
+	WriteFloat(Pad_Stiff_Y_Addr, NewPad_Stiffness_Y)
+	WriteFloat(Stiff_X_Addr, NewStiffness_X)
 end
 
 function CameraSettingsEGS10()
-HeightAddr = kh2lib.WriteLogic-0x1614E8
-AngleAddr = kh2lib.WriteLogic-0x1614E4
-	WriteFloat(HeightAddr, NewHeight)
-	WriteFloat(AngleAddr, NewAngle)
-	WriteFloat(kh2lib.WriteLogic-0x1614EC, NewKbm_Stiffness_Y)
-	WriteFloat(kh2lib.WriteLogic-0x1614F0, NewPad_Stiffness_Y)
-	WriteFloat(kh2lib.WriteLogic-0x1614F4, NewStiffness_X)
+	HeightAddr = 0x5B1F50
+	AngleAddr = 0x5B1F54
+	Kbm_Stiff_Y_Addr = 0x5B1F4C
+	Pad_Stiff_Y_Addr = 0x5B1F48
+	Stiff_X_Addr = 0x5B1F44
 	if not bReset then
 		LogSuccess("Camera Settings for EpicGames 1.0.0.10 Applied")
+		bReset = true
+	end
+end
+
+function CameraSettingsSTEAM10()
+	HeightAddr = 0x5B1D90
+	AngleAddr = 0x5B1D94
+	Kbm_Stiff_Y_Addr = 0x5B1D8C
+	Pad_Stiff_Y_Addr = 0x5B1D88
+	Stiff_X_Addr = 0x5B1D84
+	if not bReset then
+		LogSuccess("Camera Settings for Steam 1.0.0.10 Applied")
 		bReset = true
 	end
 end
