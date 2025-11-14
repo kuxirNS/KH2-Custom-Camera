@@ -1,0 +1,7 @@
+title: "Custom Camera"
+description: "Lua script to edit KH2 camera. Requires KH2FM-Mods-equations19/KH2-Lua-Library"
+assets:
+- name: scripts/Custom-Camera.lua
+  method: copy
+  source:
+  - name: Custom-Camera.lua
