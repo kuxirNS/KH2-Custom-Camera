@@ -82,6 +82,7 @@ function _OnInit()
 	Timer = kh2lib.Timer
 	CamTyp = kh2lib.CamTyp
 	NextFrame = 0
+	NextLog = 0
 	bAllowEdit = can_edit_camera
 	CanExecute = kh2lib.CanExecute
 	if not CanExecute then
@@ -114,23 +115,21 @@ function ApplyPreset(param)
 end
 
 function VersionCheck()
+	local offset
 	if GameVersion == 0x020A then
-		HeightAddr = 0x5B1F50
-		AngleAddr = 0x5B1F54
-		Kbm_Stiff_Y_Addr = 0x5B1F4C
-		Pad_Stiff_Y_Addr = 0x5B1F48
-		Stiff_X_Addr = 0x5B1F44
+	offset = 0x0
 	elseif GameVersion == 0x030A then
-		HeightAddr = 0x5B1D90
-		AngleAddr = 0x5B1D94
-		Kbm_Stiff_Y_Addr = 0x5B1D8C
-		Pad_Stiff_Y_Addr = 0x5B1D88
-		Stiff_X_Addr = 0x5B1D84
+	offset = 0x01C0
 	else
 		LogError(GameVersionString.." is not implemented")
 		CanExecute = false
 		return
 	end
+	HeightAddr = 0x5B1F50-offset
+	AngleAddr = 0x5B1F54-offset
+	Kbm_Stiff_Y_Addr = 0x5B1F4C-offset
+	Pad_Stiff_Y_Addr = 0x5B1F48-offset
+	Stiff_X_Addr = 0x5B1F44-offset
 	LogSuccess("Using addresses for "..GameVersionString)
 end
 
@@ -149,23 +148,6 @@ local switch = param
 		Log("AutoCam Speed "..Camera.AutoCam_Speed)
 		Log(" ")
 		return
-		
-	elseif switch == "fov" then
-		Log("<EDIT> Field of View "..Camera.FoV)
-		return
-		
-	elseif switch == "height" then
-		Log("<EDIT> Height "..Camera.Height)
-		return
-		
-	elseif switch == "angle" then
-		Log("<EDIT> Angle "..Camera.Angle)
-		return
-		
-	elseif switch == "preset" then
-		Log("Loaded Preset  "..Camera.Name)
-		return
-		
 	elseif switch == "shortcuts" then
 		LogMessage([[Shortcuts 
 [Hold L1+R3] Edit
@@ -182,6 +164,29 @@ local switch = param
              Left  'Optimized'
 ]])
 		return
+	elseif ReadInt(Timer) < NextLog then
+		return
+		
+	elseif switch == "fov" then
+		Log("<EDIT> Field of View "..Camera.FoV)
+		NextLog = ReadInt(Timer)+15
+		return
+		
+	elseif switch == "height" then
+		Log("<EDIT> Height "..Camera.Height)
+		NextLog = ReadInt(Timer)+15
+		return
+		
+	elseif switch == "angle" then
+		Log("<EDIT> Angle "..Camera.Angle)
+		NextLog = ReadInt(Timer)+15
+		return
+		
+	elseif switch == "preset" then
+		Log("Loaded Preset  "..Camera.Name)
+		NextLog = ReadInt(Timer)+15
+		return
+		
 	end
 end
 
@@ -190,14 +195,14 @@ local switch = param
 	if 0 <= Camera.FoV and Camera.FoV < 200 then
 		
 		if switch == "decr" then
-			Camera.FoV = Camera.FoV - 1
+			Camera.FoV = Camera.FoV - 2
 		
 		elseif switch == "incr" then
-			Camera.FoV = Camera.FoV + 1
+			Camera.FoV = Camera.FoV + 2
 			
 		end
 		
-		if ReadByte(kh2lib.CamTyp-0x04) == 1 then-----small room
+		if ReadByte(CamTyp-0x04) == 1 then-----small room
 			NewFoV = Camera.FoV*0.0104
 		else
 			NewFoV = Camera.FoV*0.015
@@ -216,10 +221,10 @@ local switch = param
 	if -50 <= Camera.Height and Camera.Height < 200 then
 		
 		if switch == "decr" then
-			Camera.Height = Camera.Height - 1
+			Camera.Height = Camera.Height - 2.5
 			
 		elseif switch == "incr" then
-			Camera.Height = Camera.Height + 1
+			Camera.Height = Camera.Height + 2.5
 			
 		end
 		
@@ -259,6 +264,16 @@ local function SetNextFrame(num)
 	NextFrame = ReadInt(Timer)+num
 end
 
+local function Update()
+	if ReadByte(CamTyp) == 2 then-------LockON
+		WriteFloat(CamTyp-0x10, NewFoV)
+	else
+		WriteFloat(CamTyp+0x98, NewFoV)
+	end
+	WriteFloat(CamTyp-0xB8, NewSwivel_X_Speed)
+	WriteFloat(CamTyp-0xC0, NewAutoCam_Speed)
+end
+
 function _OnFrame()
 	if ReadInt(Timer) < NextFrame then
 		return
@@ -272,84 +287,93 @@ function _OnFrame()
 	else
 		NewFoV = Camera.FoV*0.015
 	end
-	if ReadByte(CamTyp) == 2 then-------LockON
-		WriteFloat(CamTyp-0x10, NewFoV)
-	else
-		WriteFloat(CamTyp+0x98, NewFoV)
-	end
-	WriteFloat(CamTyp-0xB8, NewSwivel_X_Speed)
-	WriteFloat(CamTyp-0xC0, NewAutoCam_Speed)
+	Update()
 	SetNextFrame(8)
 	if bAllowEdit then
 		---------------Hold R3+L1---------------
 		if ReadByte(Input + 0x02) == 0x82 then
-			SetNextFrame(4)
+			SetNextFrame(1)
 			if ReadByte(Input + 0xD0) == 0x14 then
 				ChangeHeight("incr")
 				WriteFloat(HeightAddr, NewHeight)
+				SetNextFrame(7)
 				return
 				
 			elseif ReadByte(Input + 0xD0) == 0x44 then
 				ChangeHeight("decr")
 				WriteFloat(HeightAddr, NewHeight)
+				SetNextFrame(7)
 				return
 				
 			elseif ReadByte(Input + 0xD0) == 0x24 then
 				ChangeFoV("incr")
+				SetNextFrame(7)
+				Update()
 				return
 				
 			elseif ReadByte(Input + 0xD0) == 0x06 then
 				ResetCamera()
 				ApplyPreset(preset_default)
-				SetNextFrame(12)
+				SetNextFrame(30)
+				Update()
 				return
 				
 			elseif ReadByte(Input + 0x04) == 0x0D then
 				ChangeAngle("incr")
 				WriteFloat(AngleAddr, NewAngle)
+				SetNextFrame(7)
+				Update()
 				return
 				
 			end
 		elseif ReadByte(Input + 0x02) == 0x83 and ReadByte(Input + 0xD0) == 0x84 then
-			SetNextFrame(4)
 			ChangeFoV("decr")
+			SetNextFrame(7)
+			Update()
 			return
 		elseif ReadByte(Input + 0x02) == 0x80 or ReadByte(Input + 0x02) == 0x81 then
-			SetNextFrame(4)
+			SetNextFrame(1)
 			if ReadByte(Input + 0x04) == 0x06 then
 				ChangeAngle("decr")
 				WriteFloat(AngleAddr, NewAngle)
+				SetNextFrame(7)
+				Update()
 				return
 				---------------L1+R1---------------
 			elseif ReadByte(Input + 0x04) == 0x0C then
 				if ReadByte(Input + 0xD0) == 0x10 then
 					ResetCamera()
 					ApplyPreset(preset_optimized)
-					SetNextFrame(16)
+					SetNextFrame(30)
+					Update()
 					return
 					
 				elseif ReadByte(Input + 0xD0) == 0x20 then
 					ResetCamera()
 					ApplyPreset(preset_kh1)
-					SetNextFrame(16)
+					SetNextFrame(30)
+					Update()
 					return
 					
 				elseif ReadByte(Input + 0xD0) == 0x40 then
 					ResetCamera()
 					ApplyPreset(preset_moba)
-					SetNextFrame(16)
+					SetNextFrame(30)
+					Update()
 					return
 					
 				elseif ReadByte(Input + 0xD0) == 0x02 then
 					ResetCamera()
 					ApplyPreset(preset_default)
-					SetNextFrame(16)
+					SetNextFrame(30)
+					Update()
 					return
 					
 				elseif ReadByte(Input + 0xD0) == 0x80 then
 					ResetCamera()
 					ApplyPreset(preset_casual)
-					SetNextFrame(16)
+					SetNextFrame(30)
+					Update()
 					return
 				end
 			end
