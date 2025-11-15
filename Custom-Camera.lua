@@ -77,37 +77,22 @@ function _OnInit()
 	RequireKH2LibraryVersion(2)
 	RequirePCGameVersion()
 	GameVersion = kh2lib.GameVersion
+	GameVersionString = kh2lib.GameVersionString
 	Input = kh2lib.Input
+	Timer = kh2lib.Timer
+	CamTyp = kh2lib.CamTyp
 	NextFrame = 0
 	bAllowEdit = can_edit_camera
 	CanExecute = kh2lib.CanExecute
 	if not CanExecute then
 		return
 	end
-	if GameVersion == 0x020A then
-		CameraSettingsEGS10()
-	elseif GameVersion == 0x030A then
-		CameraSettingsSTEAM10()
-	else
-		LogError("GameVersion is not implemented")
-		CanExecute = false
+	VersionCheck()
+	if not CanExecute then
 		return
 	end
 	ApplyPreset(Preset)
-	LogMessage [[Shortcuts 
-[Hold L1+R3] Edit
-
-      Left   -  FoV   +   Right
-      Down   - Height +    Up            L3 Reset to Default
-       L2    - Angle  +    R2
-
-[Hold L1+R1] Presets
-
-              Up   'Casual'
-             Down  'Moba'
-             Right 'KH1'                 L3 Reset to Default
-             Left  'Optimized'
-]]
+	LogCamera("shortcuts")
 end
 
 function ApplyPreset(param)
@@ -128,22 +113,25 @@ function ApplyPreset(param)
 	LogCamera("all")
 end
 
-function CameraSettingsEGS10()
-	HeightAddr = 0x5B1F50
-	AngleAddr = 0x5B1F54
-	Kbm_Stiff_Y_Addr = 0x5B1F4C
-	Pad_Stiff_Y_Addr = 0x5B1F48
-	Stiff_X_Addr = 0x5B1F44
-	LogSuccess("Using addresses for Epic Games 1.0.0.10")
-end
-
-function CameraSettingsSTEAM10()
-	HeightAddr = 0x5B1D90
-	AngleAddr = 0x5B1D94
-	Kbm_Stiff_Y_Addr = 0x5B1D8C
-	Pad_Stiff_Y_Addr = 0x5B1D88
-	Stiff_X_Addr = 0x5B1D84
-	LogSuccess("Using addresses for Steam 1.0.0.10")
+function VersionCheck()
+	if GameVersion == 0x020A then
+		HeightAddr = 0x5B1F50
+		AngleAddr = 0x5B1F54
+		Kbm_Stiff_Y_Addr = 0x5B1F4C
+		Pad_Stiff_Y_Addr = 0x5B1F48
+		Stiff_X_Addr = 0x5B1F44
+		LogSuccess("Using addresses for "..GameVersionString)
+	elseif GameVersion == 0x030A then
+		HeightAddr = 0x5B1D90
+		AngleAddr = 0x5B1D94
+		Kbm_Stiff_Y_Addr = 0x5B1D8C
+		Pad_Stiff_Y_Addr = 0x5B1D88
+		Stiff_X_Addr = 0x5B1D84
+		LogSuccess("Using addresses for "..GameVersionString)
+	else
+		LogError(GameVersionString.." is not implemented")
+		CanExecute = false
+	end
 end
 
 function LogCamera(param)
@@ -166,18 +154,34 @@ local switch = param
 		Log("<EDIT> Field of View "..Camera.FoV)
 		return
 		
-		elseif switch == "height" then
+	elseif switch == "height" then
 		Log("<EDIT> Height "..Camera.Height)
 		return
 		
-		elseif switch == "angle" then
+	elseif switch == "angle" then
 		Log("<EDIT> Angle "..Camera.Angle)
 		return
 		
-		elseif switch == "preset" then
+	elseif switch == "preset" then
 		Log("Loaded Preset  "..Camera.Name)
 		return
 		
+	elseif switch == "shortcuts" then
+		LogMessage([[Shortcuts 
+[Hold L1+R3] Edit
+
+      Left   -  FoV   +   Right
+      Down   - Height +    Up            L3 Reset to Default
+       L2    - Angle  +    R2
+
+[Hold L1+R1] Presets
+
+              Up   'Casual'
+             Down  'Moba'
+             Right 'KH1'                 L3 Reset to Default
+             Left  'Optimized'
+]])
+		return
 	end
 end
 
@@ -186,10 +190,10 @@ local switch = param
 	if 0 <= Camera.FoV and Camera.FoV < 200 then
 		
 		if switch == "decr" then
-			Camera.FoV = Camera.FoV - 0.5
+			Camera.FoV = Camera.FoV - 1
 		
 		elseif switch == "incr" then
-			Camera.FoV = Camera.FoV + 0.5
+			Camera.FoV = Camera.FoV + 1
 			
 		end
 		
@@ -252,29 +256,29 @@ local switch = param
 end
 
 local function SetNextFrame(num)
-	NextFrame = ReadInt(kh2lib.Timer)+num
+	NextFrame = ReadInt(Timer)+num
 end
 
 function _OnFrame()
-	if ReadInt(kh2lib.Timer) < NextFrame then
+	if ReadInt(Timer) < NextFrame then
 		return
 	end
 	if not CanExecute then
 		return
 	end
 	
-	if ReadByte(kh2lib.CamTyp-0x04) == 1 then-----small room
+	if ReadByte(CamTyp-0x04) == 1 then-----small room
 		NewFoV = Camera.FoV*0.0104
 	else
 		NewFoV = Camera.FoV*0.015
 	end
-	if ReadByte(kh2lib.CamTyp) == 2 then-------LockON
-		WriteFloat(kh2lib.CamTyp-0x10, NewFoV)
+	if ReadByte(CamTyp) == 2 then-------LockON
+		WriteFloat(CamTyp-0x10, NewFoV)
 	else
-		WriteFloat(kh2lib.CamTyp+0x98, NewFoV)
+		WriteFloat(CamTyp+0x98, NewFoV)
 	end
-	WriteFloat(kh2lib.CamTyp-0xB8, NewSwivel_X_Speed)
-	WriteFloat(kh2lib.CamTyp-0xC0, NewAutoCam_Speed)
+	WriteFloat(CamTyp-0xB8, NewSwivel_X_Speed)
+	WriteFloat(CamTyp-0xC0, NewAutoCam_Speed)
 	SetNextFrame(8)
 	if bAllowEdit then
 		---------------Hold R3+L1---------------
@@ -297,6 +301,7 @@ function _OnFrame()
 			elseif ReadByte(Input + 0xD0) == 0x06 then
 				ResetCamera()
 				ApplyPreset(preset_default)
+				SetNextFrame(12)
 				return
 				
 			elseif ReadByte(Input + 0x04) == 0x0D then
