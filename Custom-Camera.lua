@@ -120,18 +120,18 @@ function VersionCheck()
 		Kbm_Stiff_Y_Addr = 0x5B1F4C
 		Pad_Stiff_Y_Addr = 0x5B1F48
 		Stiff_X_Addr = 0x5B1F44
-		LogSuccess("Using addresses for "..GameVersionString)
 	elseif GameVersion == 0x030A then
 		HeightAddr = 0x5B1D90
 		AngleAddr = 0x5B1D94
 		Kbm_Stiff_Y_Addr = 0x5B1D8C
 		Pad_Stiff_Y_Addr = 0x5B1D88
 		Stiff_X_Addr = 0x5B1D84
-		LogSuccess("Using addresses for "..GameVersionString)
 	else
 		LogError(GameVersionString.." is not implemented")
 		CanExecute = false
+		return
 	end
+	LogSuccess("Using addresses for "..GameVersionString)
 end
 
 function LogCamera(param)
