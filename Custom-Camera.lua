@@ -1,8 +1,8 @@
-LUAGUI_NAME = "Custom Camera"
+LUAGUI_NAME = "Custom-Camera"
 LUAGUI_AUTH = "kuxir"
-LUAGUI_DESC = "lua script to edit the game camera"
+LUAGUI_DESC = "Lua script to edit KH2 camera. Requires KH2FM-Mods-equations19/KH2-Lua-Library"
 
-local can_edit_camera = true --set this to false to alleviate workload and only apply the default preset
+local can_edit_camera = true --set this to false if shortcuts conflict with other scripts
 
 local function ResetCamera()
 
@@ -65,7 +65,7 @@ end
 
 function _OnInit()
 	ResetCamera()
-	Camera = preset_default
+	Preset = preset_default
 	
 	kh2libstatus, kh2lib = pcall(require, "kh2lib")
 	if not kh2libstatus then
@@ -78,17 +78,22 @@ function _OnInit()
 	RequirePCGameVersion()
 	GameVersion = kh2lib.GameVersion
 	Input = kh2lib.Input
-	CanExecute = kh2lib.CanExecute
+	NextFrame = 0
 	bAllowEdit = can_edit_camera
-	bReset = false
+	CanExecute = kh2lib.CanExecute
 	if not CanExecute then
 		return
 	end
-	ApplyPreset(Camera)
-	if not CanExecute then
+	if GameVersion == 0x020A then
+		CameraSettingsEGS10()
+	elseif GameVersion == 0x030A then
+		CameraSettingsSTEAM10()
+	else
+		LogError("GameVersion is not implemented")
+		CanExecute = false
 		return
 	end
-	LogCamera("all")
+	ApplyPreset(Preset)
 	LogMessage [[Shortcuts 
 [Hold L1+R3] Edit
 
@@ -115,20 +120,12 @@ function ApplyPreset(param)
 	NewStiffness_X = Camera.Stiffness_X*0.003
 	NewSwivel_X_Speed = Camera.Swivel_X_Speed*0.005235987902
 	NewAutoCam_Speed = Camera.AutoCam_Speed*0.0004363323096
-	if GameVersion == 0x020A then
-		CameraSettingsEGS10()
-	elseif GameVersion == 0x030A then
-		CameraSettingsSTEAM10()
-	else
-		LogError("GameVersion is not implemented")
-		CanExecute = false
-		return
-	end
 	WriteFloat(HeightAddr, NewHeight)
 	WriteFloat(AngleAddr, NewAngle)
 	WriteFloat(Kbm_Stiff_Y_Addr, NewKbm_Stiffness_Y)
 	WriteFloat(Pad_Stiff_Y_Addr, NewPad_Stiffness_Y)
 	WriteFloat(Stiff_X_Addr, NewStiffness_X)
+	LogCamera("all")
 end
 
 function CameraSettingsEGS10()
@@ -137,10 +134,7 @@ function CameraSettingsEGS10()
 	Kbm_Stiff_Y_Addr = 0x5B1F4C
 	Pad_Stiff_Y_Addr = 0x5B1F48
 	Stiff_X_Addr = 0x5B1F44
-	if not bReset then
-		LogSuccess("Camera Settings for EpicGames 1.0.0.10 Applied")
-		bReset = true
-	end
+	LogSuccess("Using addresses for Epic Games 1.0.0.10")
 end
 
 function CameraSettingsSTEAM10()
@@ -149,17 +143,14 @@ function CameraSettingsSTEAM10()
 	Kbm_Stiff_Y_Addr = 0x5B1D8C
 	Pad_Stiff_Y_Addr = 0x5B1D88
 	Stiff_X_Addr = 0x5B1D84
-	if not bReset then
-		LogSuccess("Camera Settings for Steam 1.0.0.10 Applied")
-		bReset = true
-	end
+	LogSuccess("Using addresses for Steam 1.0.0.10")
 end
 
 function LogCamera(param)
 local switch = param
 	if switch == "all" then
-		Log("Preset  "..Camera.Name)
 		Log(" ")
+		LogMessage(Camera.Name.." Preset Applied")
 		Log("Field of View "..Camera.FoV)
 		Log("Height "..Camera.Height)
 		Log("Angle "..Camera.Angle)
@@ -172,19 +163,19 @@ local switch = param
 		return
 		
 	elseif switch == "fov" then
-		LogMessage("Field of View "..Camera.FoV)
+		Log("<EDIT> Field of View "..Camera.FoV)
 		return
 		
 		elseif switch == "height" then
-		LogMessage("Height "..Camera.Height)
+		Log("<EDIT> Height "..Camera.Height)
 		return
 		
 		elseif switch == "angle" then
-		LogMessage("Angle "..Camera.Angle)
+		Log("<EDIT> Angle "..Camera.Angle)
 		return
 		
 		elseif switch == "preset" then
-		LogMessage("Loaded Preset  "..Camera.Name)
+		Log("Loaded Preset  "..Camera.Name)
 		return
 		
 	end
@@ -260,12 +251,17 @@ local switch = param
 	end
 end
 
+local function SetNextFrame(num)
+	NextFrame = ReadInt(kh2lib.Timer)+num
+end
+
 function _OnFrame()
+	if ReadInt(kh2lib.Timer) < NextFrame then
+		return
+	end
 	if not CanExecute then
 		return
 	end
-	
-	
 	
 	if ReadByte(kh2lib.CamTyp-0x04) == 1 then-----small room
 		NewFoV = Camera.FoV*0.0104
@@ -279,10 +275,11 @@ function _OnFrame()
 	end
 	WriteFloat(kh2lib.CamTyp-0xB8, NewSwivel_X_Speed)
 	WriteFloat(kh2lib.CamTyp-0xC0, NewAutoCam_Speed)
+	SetNextFrame(8)
 	if bAllowEdit then
 		---------------Hold R3+L1---------------
 		if ReadByte(Input + 0x02) == 0x82 then
-			
+			SetNextFrame(4)
 			if ReadByte(Input + 0xD0) == 0x14 then
 				ChangeHeight("incr")
 				WriteFloat(HeightAddr, NewHeight)
@@ -300,7 +297,6 @@ function _OnFrame()
 			elseif ReadByte(Input + 0xD0) == 0x06 then
 				ResetCamera()
 				ApplyPreset(preset_default)
-					LogCamera("preset")
 				return
 				
 			elseif ReadByte(Input + 0x04) == 0x0D then
@@ -309,13 +305,13 @@ function _OnFrame()
 				return
 				
 			end
-			
 		elseif ReadByte(Input + 0x02) == 0x83 and ReadByte(Input + 0xD0) == 0x84 then
+			SetNextFrame(4)
 			ChangeFoV("decr")
 			return
-			
 		elseif ReadByte(Input + 0x02) == 0x80 or ReadByte(Input + 0x02) == 0x81 then
-			if ReadByte(Input + 0x04) == 0x06 then-------L2
+			SetNextFrame(4)
+			if ReadByte(Input + 0x04) == 0x06 then
 				ChangeAngle("decr")
 				WriteFloat(AngleAddr, NewAngle)
 				return
@@ -324,31 +320,31 @@ function _OnFrame()
 				if ReadByte(Input + 0xD0) == 0x10 then
 					ResetCamera()
 					ApplyPreset(preset_optimized)
-					LogCamera("preset")
+					SetNextFrame(16)
 					return
 					
 				elseif ReadByte(Input + 0xD0) == 0x20 then
 					ResetCamera()
 					ApplyPreset(preset_kh1)
-					LogCamera("preset")
+					SetNextFrame(16)
 					return
 					
 				elseif ReadByte(Input + 0xD0) == 0x40 then
 					ResetCamera()
 					ApplyPreset(preset_moba)
-							LogCamera("preset")
+					SetNextFrame(16)
 					return
 					
 				elseif ReadByte(Input + 0xD0) == 0x02 then
 					ResetCamera()
 					ApplyPreset(preset_default)
-					LogCamera("preset")
+					SetNextFrame(16)
 					return
 					
 				elseif ReadByte(Input + 0xD0) == 0x80 then
 					ResetCamera()
 					ApplyPreset(preset_casual)
-					LogCamera("preset")
+					SetNextFrame(16)
 					return
 				end
 			end
