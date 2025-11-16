@@ -106,11 +106,15 @@ function ApplyPreset(param)
 	NewStiffness_X = Camera.Stiffness_X*0.003
 	NewSwivel_X_Speed = Camera.Swivel_X_Speed*0.005235987902
 	NewAutoCam_Speed = Camera.AutoCam_Speed*0.0004363323096
+--
 	WriteFloat(HeightAddr, NewHeight)
+	WriteFloat(HeightAddr+0x0564, -NewHeight)
 	WriteFloat(AngleAddr, NewAngle)
+	WriteFloat(AngleAddr+0x0564, NewAngle*1.4666666666666)
 	WriteFloat(Kbm_Stiff_Y_Addr, NewKbm_Stiffness_Y)
 	WriteFloat(Pad_Stiff_Y_Addr, NewPad_Stiffness_Y)
 	WriteFloat(Stiff_X_Addr, NewStiffness_X)
+--
 	LogCamera("all")
 end
 
@@ -296,12 +300,14 @@ function _OnFrame()
 			if ReadByte(Input + 0xD0) == 0x14 then
 				ChangeHeight("incr")
 				WriteFloat(HeightAddr, NewHeight)
+				WriteFloat(HeightAddr+0x0564, -NewHeight)
 				SetNextFrame(7)
 				return
 				
 			elseif ReadByte(Input + 0xD0) == 0x44 then
 				ChangeHeight("decr")
 				WriteFloat(HeightAddr, NewHeight)
+				WriteFloat(HeightAddr+0x0564, -NewHeight)
 				SetNextFrame(7)
 				return
 				
@@ -321,6 +327,7 @@ function _OnFrame()
 			elseif ReadByte(Input + 0x04) == 0x0D then
 				ChangeAngle("incr")
 				WriteFloat(AngleAddr, NewAngle)
+				WriteFloat(AngleAddr+0x0564, NewAngle*1.4666666666666)
 				SetNextFrame(7)
 				Update()
 				return
@@ -336,6 +343,7 @@ function _OnFrame()
 			if ReadByte(Input + 0x04) == 0x06 then
 				ChangeAngle("decr")
 				WriteFloat(AngleAddr, NewAngle)
+				WriteFloat(AngleAddr+0x0564, NewAngle*1.4666666666666)
 				SetNextFrame(7)
 				Update()
 				return
